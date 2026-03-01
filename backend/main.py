@@ -40,6 +40,9 @@ async def analyze_pdf(branch: str, file: UploadFile = File(...)):
         "status": "success"
     }
 
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}
 
 @app.get("/priority/{branch}")
 def get_priority(branch: str, top_n: int = 5):
