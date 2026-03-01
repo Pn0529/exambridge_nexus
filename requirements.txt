@@ -5,3 +5,6 @@ python-multipart
 pymongo
 python-jose[cryptography]
 passlib[bcrypt]
+pdfplumber
+google-api-python-client
+google-auth-httplib2
