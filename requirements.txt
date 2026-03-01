@@ -3,4 +3,5 @@ uvicorn
 gunicorn
 python-multipart
 pymongo
-python-jose
+python-jose[cryptography]
+passlib[bcrypt]
