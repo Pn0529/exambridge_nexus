@@ -8,3 +8,4 @@ passlib[bcrypt]
 pdfplumber
 google-api-python-client
 google-auth-httplib2
+scikit-learn
