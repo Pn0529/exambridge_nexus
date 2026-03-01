@@ -79,8 +79,7 @@ def get_priority(branch: str, top_n: int = 5):
         "priority_topics": enriched_topics
     }
 import os
-import uvicorn
-from backend.app import app   # adjust if your FastAPI instance is in another file
+import uvicorn 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
