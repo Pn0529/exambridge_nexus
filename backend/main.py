@@ -1,6 +1,7 @@
 from backend.routes.auth import router as auth_router
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from backend.services.nlp_service import extract_text_from_pdf, analyze_text_against_syllabus
 from backend.services.youtube_service import fetch_youtube_videos
 from backend.utils.syllabus_loader import load_syllabus
@@ -10,7 +11,7 @@ import uvicorn
 app = FastAPI(title="ExamBridge Nexus Backend")
 
 # -------------------------------
-# ✅ CORS CONFIG (IMPORTANT)
+# CORS CONFIG
 # -------------------------------
 origins = [
     "https://pothulaannapurna8.github.io",
@@ -32,9 +33,10 @@ app.add_middleware(
 app.include_router(auth_router)
 
 # -------------------------------
-# CACHE STORAGE
+# TEMP STORAGE (Upgrade to DB later)
 # -------------------------------
 analysis_cache = {}
+user_progress = {}
 
 # -------------------------------
 # ROOT
@@ -65,13 +67,38 @@ async def analyze_pdf(branch: str, file: UploadFile = File(...)):
 
     results = analyze_text_against_syllabus(text, syllabus_data)
 
-    # Save in cache
     analysis_cache[branch] = results
 
     return {
         "success": True,
         "branch": branch,
         "analysis": results
+    }
+
+# -------------------------------
+# DASHBOARD (Chart.js Friendly)
+# -------------------------------
+@app.get("/dashboard/{branch}")
+def get_dashboard(branch: str):
+    branch = branch.lower()
+
+    if branch not in analysis_cache:
+        raise HTTPException(status_code=404, detail="No analysis found")
+
+    analysis = analysis_cache[branch]
+
+    subjects = []
+    scores = []
+
+    for subject, topics in analysis.items():
+        avg_score = sum(topics.values()) / len(topics)
+        subjects.append(subject)
+        scores.append(round(avg_score, 2))
+
+    return {
+        "success": True,
+        "labels": subjects,
+        "data": scores
     }
 
 # -------------------------------
@@ -82,7 +109,7 @@ def get_priority(branch: str, top_n: int = 5):
     branch = branch.lower()
 
     if branch not in analysis_cache:
-        raise HTTPException(status_code=404, detail="No analysis found for this branch")
+        raise HTTPException(status_code=404, detail="No analysis found")
 
     analysis = analysis_cache[branch]
 
@@ -111,6 +138,62 @@ def get_priority(branch: str, top_n: int = 5):
         "success": True,
         "branch": branch,
         "priority_topics": enriched_topics
+    }
+
+# -------------------------------
+# STUDY PLAN DOWNLOAD
+# -------------------------------
+@app.get("/study-plan/{branch}")
+def generate_study_plan(branch: str):
+    branch = branch.lower()
+
+    if branch not in analysis_cache:
+        raise HTTPException(status_code=404, detail="No analysis found")
+
+    analysis = analysis_cache[branch]
+    plan = []
+
+    for subject, topics in analysis.items():
+        weak_topics = [t for t, s in topics.items() if s < 50]
+        if weak_topics:
+            plan.append({
+                "subject": subject,
+                "focus_topics": weak_topics
+            })
+
+    return JSONResponse(content={
+        "success": True,
+        "branch": branch,
+        "study_plan": plan
+    })
+
+# -------------------------------
+# MARK TOPIC AS DONE
+# -------------------------------
+@app.post("/mark-done")
+def mark_done(data: dict = Body(...)):
+    email = data.get("email")
+    topic = data.get("topic")
+
+    if not email or not topic:
+        raise HTTPException(status_code=400, detail="Missing data")
+
+    if email not in user_progress:
+        user_progress[email] = []
+
+    if topic not in user_progress[email]:
+        user_progress[email].append(topic)
+
+    return {"success": True}
+
+# -------------------------------
+# GET USER PROGRESS
+# -------------------------------
+@app.get("/progress/{email}")
+def get_progress(email: str):
+    return {
+        "success": True,
+        "completed_topics": user_progress.get(email, [])
     }
 
 # -------------------------------
